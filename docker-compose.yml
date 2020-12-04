@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  transactionqueryaggregator:
+    image: ${DOCKER_REGISTRY-}transactionqueryaggregator
+    build:
+      context: .
+      dockerfile: ./TransactionQueryAggregator/Dockerfile

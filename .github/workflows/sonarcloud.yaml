@@ -1,0 +1,32 @@
+name: sonarCS
+env:
+  SONAR_ORG: filetrust-2 
+  SONAR_PROJECT: filetrust_transaction-query-aggregator 
+  
+on:
+  push:
+    branches: [ develop ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: glasswallsolutions/icap-cs-base:latest
+        
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          submodules: true
+          token: ${{ secrets.TOKEN_GITHUB }}
+     
+
+      - name: scan c# code
+        run: |
+            /root/.dotnet/tools/dotnet-sonarscanner begin   /o:"${{ env.SONAR_ORG }}"  /d:sonar.login="${{ secrets.SONAR_TOKEN }}"  /k:"${{ env.SONAR_PROJECT }}"  /d:sonar.host.url=https://sonarcloud.io /d:sonar.cfamily.build-wrapper-output="build_wrapper_output_directory"
+            dotnet restore ./TransactionQueryAggregator.sln 
+            dotnet build ./TransactionQueryAggregator.sln --configuration Release --no-restore
+            dotnet test ./TransactionQueryAggregator.sln 
+            /root/.dotnet/tools/dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}" 
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+            JAVA_HOME: "/usr/lib/jvm/java/"

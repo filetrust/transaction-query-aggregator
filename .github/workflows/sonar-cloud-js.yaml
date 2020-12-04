@@ -1,0 +1,23 @@
+name: nodejs-sonar
+on:
+  push:
+    branches: [ develop ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: glasswallsolutions/transaction-node-base:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+        with:
+          submodules: true
+          token: ${{ secrets.TOKEN_GITHUB }}
+      - name: Build  
+        working-directory: gh-page
+        run: |
+          npm install
+          npm run build
+          /opt/sonar-scanner-4.4.0.2170-linux/bin/sonar-scanner
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
