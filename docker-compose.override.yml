@@ -4,16 +4,9 @@ services:
   transactionqueryaggregator:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=https://+:443;http://+:80
-      - TransactionStoreConnectionStringCsv=
-      - ShareName=
-      - UseMountedShare=true
+      - ASPNETCORE_URLS=https://+:443
+      - TransactionQueryServiceEndpointCsv=
     ports:
-      - "32769:80"
-      - "32768:443"
+      - "39433:443"
     volumes:
       - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
-      - C:\Shares\share1:/app/transactions/share1:ro
-      - C:\Shares\share1:/app/bin/Debug/netcoreapp3.1/transactions/share1:ro
-      - C:\Shares\share2:/app/transactions/share2:ro
-      - C:\Shares\share2:/app/bin/Debug/netcoreapp3.1/transactions/share2:ro

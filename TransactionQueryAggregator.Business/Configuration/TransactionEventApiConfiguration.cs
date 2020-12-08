@@ -4,7 +4,6 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Config
 {
     public class TransactionQueryAggregatorConfiguration : ITransactionQueryAggregatorConfiguration
     {
-        public string TransactionStoreConnectionStringCsv { get; set; }
-        public string ShareName { get; set; }
+        public string TransactionQueryServiceEndpointCsv { get; set; }
     }
 }

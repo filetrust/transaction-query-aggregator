@@ -2,7 +2,6 @@
 {
     public interface ITransactionQueryAggregatorConfiguration
     {
-        string TransactionStoreConnectionStringCsv { get; }
-        string ShareName { get; }
+        string TransactionQueryServiceEndpointCsv { get; }
     }
 }

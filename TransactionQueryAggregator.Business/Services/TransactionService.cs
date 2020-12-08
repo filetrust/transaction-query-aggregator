@@ -1,37 +1,30 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Store;
+using Flurl;
+using Flurl.Http;
+using Flurl.Http.Configuration;
+using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Configuration;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Enums;
-using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Models.AnalysisReport;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Models.V1;
-using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Serialisation;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Services;
 using Microsoft.Extensions.Logging;
+using System.Net.Http;
 
 namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Services
 {
     public class TransactionService : ITransactionService
     {
         private readonly ILogger<ITransactionService> _logger;
-        private readonly IEnumerable<IFileShare> _fileShares;
-        private readonly IJsonSerialiser _jsonSerialiser;
-        private readonly IXmlSerialiser _xmlSerialiser;
+        private readonly ITransactionQueryAggregatorConfiguration _configuration;
 
         public TransactionService(
             ILogger<ITransactionService> logger, 
-            IEnumerable<IFileShare> fileStores,
-            IJsonSerialiser jsonSerialiser,
-            IXmlSerialiser xmlSerialiser)
+            ITransactionQueryAggregatorConfiguration configuration)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _fileShares = fileStores ?? throw new ArgumentNullException(nameof(fileStores));
-            _jsonSerialiser = jsonSerialiser ?? throw new ArgumentNullException(nameof(jsonSerialiser));
-            _xmlSerialiser = xmlSerialiser ?? throw new ArgumentNullException(nameof(xmlSerialiser));
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         }
 
         public Task<GetTransactionsResponseV1> GetTransactionsAsync(GetTransactionsRequestV1 request, CancellationToken cancellationToken)
@@ -51,33 +44,33 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
 
         private async Task<GetDetailResponseV1> InternalTryGetDetailAsync(string fileDirectory, CancellationToken cancellationToken)
         {
-            GWallInfo analysisReport = null;
-            var status = DetailStatus.FileNotFound;
-
-            foreach (var fileStore in _fileShares)
+            foreach (var transactionQueryServiceEndpoint in _configuration.TransactionQueryServiceEndpointCsv.Split(',').Select(s => $"{s}/api/v1/transactions"))
             {
-                if (!await fileStore.ExistsAsync(fileDirectory, cancellationToken)) continue;
-
-                var fullPath = $"{fileDirectory}/report.xml";
-
-                using (var analysisReportStream = await fileStore.DownloadAsync(fullPath, cancellationToken))
+                try
                 {
-                    if (analysisReportStream == null)
-                    {
-                        status = DetailStatus.AnalysisReportNotFound;
-                        break;
-                    }
+                    _logger.LogInformation("Querying transaction query service : '{0}'", transactionQueryServiceEndpoint);
+                    
+                    var detail = await InternalFlurlEndpoint(transactionQueryServiceEndpoint)
+                        .SetQueryParam("filePath", fileDirectory)
+                        .GetJsonAsync<GetDetailResponseV1>(cancellationToken);
+                    
+                    _logger.LogInformation("Queried transaction query service : '{0}' - status: '{1}'", transactionQueryServiceEndpoint, detail?.Status);
 
-                    analysisReport = await _xmlSerialiser.Deserialize<GWallInfo>(analysisReportStream, Encoding.UTF8);
-                    status = DetailStatus.Success;
-                    break;
+                    if (detail == null || detail.Status != DetailStatus.Success)
+                        continue;
+
+                    return detail;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex.ToString());
                 }
             }
 
             return new GetDetailResponseV1
             {
-                Status = status,
-                AnalysisReport = analysisReport
+                Status = DetailStatus.FileNotFound,
+                AnalysisReport = null
             };
         }
 
@@ -85,57 +78,52 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
             GetTransactionsRequestV1 request, 
             CancellationToken cancellationToken)
         {
-            _logger.LogInformation("Searching file store ");
+            var endpointQueries = _configuration.TransactionQueryServiceEndpointCsv
+                .Split(',')
+                .Select(transactionQueryServiceEndpoint => TryQueryTransactions($"{transactionQueryServiceEndpoint}/api/v1/transactions", request, cancellationToken))
+                .ToList();
 
-            var items = new List<GetTransactionsResponseV1File>();
-
-            foreach (var share in _fileShares.AsParallel())
-            {
-                await foreach (var item in HandleShare(share, request.Filter, cancellationToken))
-                {
-                    items.Add(item);
-                }
-            }
+            var responses = await Task.WhenAll(endpointQueries);
 
             return new GetTransactionsResponseV1
             {
-                Files = items
+                Files = responses.Where(s => s != null).SelectMany(s => s.Files)
             };
         }
 
-        private async IAsyncEnumerable<GetTransactionsResponseV1File> HandleShare(
-            IFileShare share,
-            FileStoreFilterV1 filter, 
-            [EnumeratorCancellation] CancellationToken cancellationToken)
+        private async Task<GetTransactionsResponseV1> TryQueryTransactions(string endpoint, GetTransactionsRequestV1 requestBody, CancellationToken cancellationToken)
         {
-            await foreach (var fileDirectory in share.ListAsync(new DatePathFilter(filter), cancellationToken))
+            try
             {
-                if (filter.AllFileIdsFound) yield break;
-
-                var eventFile = await DownloadFile(share, fileDirectory, cancellationToken);
-
-                if (!eventFile.TryParseEventDateWithFilter(filter, out var timestamp)) continue;
-                if (!eventFile.TryParseFileIdWithFilter(filter, out var fileId)) continue;
-                if (!eventFile.TryParseFileTypeWithFilter(filter, out var fileType)) continue;
-                if (!eventFile.TryParseRiskWithFilter(filter, out var risk)) continue;
-                if (!eventFile.TryParsePolicyIdWithFilter(filter, out var policyId)) continue;
-
-                yield return new GetTransactionsResponseV1File
-                {
-                    ActivePolicyId = policyId,
-                    DetectionFileType = fileType,
-                    FileId = fileId,
-                    Risk = risk,
-                    Timestamp = timestamp,
-                    Directory = fileDirectory
-                };
+                _logger.LogInformation("Querying transaction query service '{0}'", endpoint);
+                if (string.IsNullOrWhiteSpace(endpoint)) throw new ArgumentException("Value must be defined", nameof(endpoint));
+                var response = await InternalFlurlEndpoint(endpoint).PostJsonAsync(requestBody, cancellationToken);
+                return await response.GetJsonAsync<GetTransactionsResponseV1>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(0, ex, "Could not get transactions from '{0}'", endpoint);
+                return null;
             }
         }
 
-        private async Task<TransactionAdapationEventMetadataFile> DownloadFile(IFileShare share, string fileDirectory, CancellationToken cancellationToken)
+        private static string InternalFlurlEndpoint(string endpoint)
         {
-            using var ms = await share.DownloadAsync($"{fileDirectory}/metadata.json", cancellationToken);
-            return await _jsonSerialiser.Deserialize<TransactionAdapationEventMetadataFile>(ms, Encoding.UTF8);
+            FlurlHttp.ConfigureClient(endpoint, cli =>
+                cli.Settings.HttpClientFactory = new UntrustedCertClientFactory());
+
+            return endpoint;
+        }
+    }
+
+    public class UntrustedCertClientFactory : DefaultHttpClientFactory
+    {
+        public override HttpMessageHandler CreateMessageHandler()
+        {
+            return new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (a, b, c, d) => true
+            };
         }
     }
 }

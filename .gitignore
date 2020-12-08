@@ -111,3 +111,4 @@ launchsettings.json
 Properties/
 *.v2
 *.suo
+.vs/TransactionQueryAggregator/config/applicationhost.config
