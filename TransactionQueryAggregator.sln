@@ -19,8 +19,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransactionQueryAggregator.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestCommon", "tests\TestCommon\TestCommon.csproj", "{6B9D7071-7A22-4142-AAA7-1D36AF40960F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TransactionQueryAggregator.Function", "TransactionQueryAggregator.Function\TransactionQueryAggregator.Function.csproj", "{D5C9657A-B7EF-4924-8095-A759DAEADE72}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D848236A-9D86-4B06-B39C-9406813D2A67}"
 	ProjectSection(SolutionItems) = preProject
 		Dockerfile = Dockerfile
@@ -60,10 +58,6 @@ Global
 		{6B9D7071-7A22-4142-AAA7-1D36AF40960F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6B9D7071-7A22-4142-AAA7-1D36AF40960F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6B9D7071-7A22-4142-AAA7-1D36AF40960F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D5C9657A-B7EF-4924-8095-A759DAEADE72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D5C9657A-B7EF-4924-8095-A759DAEADE72}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D5C9657A-B7EF-4924-8095-A759DAEADE72}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D5C9657A-B7EF-4924-8095-A759DAEADE72}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
