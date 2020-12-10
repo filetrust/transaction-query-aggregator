@@ -2,15 +2,12 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Flurl;
-using Flurl.Http;
-using Flurl.Http.Configuration;
+using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Configuration;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Enums;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Models.V1;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Services;
 using Microsoft.Extensions.Logging;
-using System.Net.Http;
 
 namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Services
 {
@@ -18,16 +15,19 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
     {
         private readonly ILogger<ITransactionService> _logger;
         private readonly ITransactionQueryAggregatorConfiguration _configuration;
+        private readonly IGlasswallHttpClient _httpClient;
 
         public TransactionService(
             ILogger<ITransactionService> logger, 
-            ITransactionQueryAggregatorConfiguration configuration)
+            ITransactionQueryAggregatorConfiguration configuration,
+            IGlasswallHttpClient httpClient)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         }
 
-        public Task<GetTransactionsResponseV1> GetTransactionsAsync(GetTransactionsRequestV1 request, CancellationToken cancellationToken)
+        public Task<GetTransactionsResponseV1> GetTransactionsAsync(TransactionPostModelV1 request, CancellationToken cancellationToken)
         {
             if (request == null) throw new ArgumentNullException(nameof(request));
 
@@ -44,27 +44,20 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
 
         private async Task<GetDetailResponseV1> InternalTryGetDetailAsync(string fileDirectory, CancellationToken cancellationToken)
         {
-            foreach (var transactionQueryServiceEndpoint in _configuration.TransactionQueryServiceEndpointCsv.Split(',').Select(s => $"{s}/api/v1/transactions"))
+            foreach (var endpoint in _configuration.TransactionQueryServiceEndpointCsv.Split(','))
             {
-                try
-                {
-                    _logger.LogInformation("Querying transaction query service : '{0}'", transactionQueryServiceEndpoint);
-                    
-                    var detail = await InternalFlurlEndpoint(transactionQueryServiceEndpoint)
-                        .SetQueryParam("filePath", fileDirectory)
-                        .GetJsonAsync<GetDetailResponseV1>(cancellationToken);
-                    
-                    _logger.LogInformation("Queried transaction query service : '{0}' - status: '{1}'", transactionQueryServiceEndpoint, detail?.Status);
+                _logger.LogInformation("Requesting data from Transaction query service '{0}'", endpoint);
 
-                    if (detail == null || detail.Status != DetailStatus.Success)
-                        continue;
+                var response = await _httpClient.SendAsync<GetDetailResponseV1>(
+                    new GetTransactionDetailRequest(endpoint, fileDirectory),
+                    cancellationToken);
 
-                    return detail;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex.ToString());
-                }
+                _logger.LogInformation("Requested data from Transaction query service '{0}' - {1}", endpoint, response.StatusCode);
+
+                if (response.Body == null || response.Body?.Status != DetailStatus.Success)
+                    continue;
+
+                return response.Body;
             }
 
             return new GetDetailResponseV1
@@ -75,12 +68,12 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
         }
 
         private async Task<GetTransactionsResponseV1> InternalGetTransactionsAsync(
-            GetTransactionsRequestV1 request, 
+            TransactionPostModelV1 request, 
             CancellationToken cancellationToken)
         {
             var endpointQueries = _configuration.TransactionQueryServiceEndpointCsv
                 .Split(',')
-                .Select(transactionQueryServiceEndpoint => TryQueryTransactions($"{transactionQueryServiceEndpoint}/api/v1/transactions", request, cancellationToken))
+                .Select(transactionQueryServiceEndpoint => TryQueryTransactions(transactionQueryServiceEndpoint, request, cancellationToken))
                 .ToList();
 
             var responses = await Task.WhenAll(endpointQueries);
@@ -91,39 +84,25 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
             };
         }
 
-        private async Task<GetTransactionsResponseV1> TryQueryTransactions(string endpoint, GetTransactionsRequestV1 requestBody, CancellationToken cancellationToken)
+        private async Task<GetTransactionsResponseV1> TryQueryTransactions(string endpoint, TransactionPostModelV1 requestBody, CancellationToken cancellationToken)
         {
             try
             {
-                _logger.LogInformation("Querying transaction query service '{0}'", endpoint);
-                if (string.IsNullOrWhiteSpace(endpoint)) throw new ArgumentException("Value must be defined", nameof(endpoint));
-                var response = await InternalFlurlEndpoint(endpoint).PostJsonAsync(requestBody, cancellationToken);
-                return await response.GetJsonAsync<GetTransactionsResponseV1>();
+                _logger.LogInformation("Requesting data from Transaction query service '{0}'", endpoint);
+
+                var response = await _httpClient.SendAsync<GetTransactionsResponseV1>(
+                    new GetTransactionsRequest(endpoint, requestBody), 
+                    cancellationToken);
+
+                _logger.LogInformation("Requested data from Transaction query service '{0}' - {1}", endpoint, response.StatusCode);
+
+                return response.Body;
             }
             catch (Exception ex)
             {
                 _logger.LogError(0, ex, "Could not get transactions from '{0}'", endpoint);
                 return null;
             }
-        }
-
-        private static string InternalFlurlEndpoint(string endpoint)
-        {
-            FlurlHttp.ConfigureClient(endpoint, cli =>
-                cli.Settings.HttpClientFactory = new UntrustedCertClientFactory());
-
-            return endpoint;
-        }
-    }
-
-    public class UntrustedCertClientFactory : DefaultHttpClientFactory
-    {
-        public override HttpMessageHandler CreateMessageHandler()
-        {
-            return new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = (a, b, c, d) => true
-            };
         }
     }
 }

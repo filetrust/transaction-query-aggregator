@@ -24,7 +24,7 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Controllers
 
         [HttpPost]
         [ValidateModel]
-        public async Task<IActionResult> GetTransactions([Required][FromBody]GetTransactionsRequestV1 request, CancellationToken cancellationToken)
+        public async Task<IActionResult> GetTransactions([Required][FromBody]TransactionPostModelV1 request, CancellationToken cancellationToken)
         {
             _logger.LogInformation("Beginning get transactions request");
 

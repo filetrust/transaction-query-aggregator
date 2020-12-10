@@ -6,7 +6,7 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Common.Services
 {
     public interface ITransactionService
     {
-        Task<GetTransactionsResponseV1> GetTransactionsAsync(GetTransactionsRequestV1 request, CancellationToken cancellationToken);
+        Task<GetTransactionsResponseV1> GetTransactionsAsync(TransactionPostModelV1 request, CancellationToken cancellationToken);
         Task<GetDetailResponseV1> GetDetailAsync(string fileDirectory, CancellationToken cancellationToken);
     }
 }
