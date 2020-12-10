@@ -1,13 +1,11 @@
+using Flurl.Http;
+using Flurl.Http.Configuration;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Configuration;
-using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Serialisation;
+using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Services;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Configuration;
-using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Configuration.Validation;
-using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Serialisation;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -17,6 +15,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Configuration;
+using System.Linq;
+using System.Net.Http;
 
 namespace Glasswall.Administration.K8.TransactionQueryAggregator
 {
@@ -51,25 +52,13 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator
                             .AllowAnyOrigin();
                     });
             });
-
-            services.TryAddTransient<IConfigurationParser, EnvironmentVariableParser>();
-            services.TryAddTransient<IDictionary<string, IConfigurationItemValidator>>(_ => new Dictionary<string, IConfigurationItemValidator>
-            {
-                {nameof(ITransactionQueryAggregatorConfiguration.TransactionQueryServiceEndpointCsv), new StringValidator(1)}
-            });
-            services.TryAddSingleton<ITransactionQueryAggregatorConfiguration>(serviceProvider =>
-            {
-                var configuration = serviceProvider.GetRequiredService<IConfigurationParser>();
-                return configuration.Parse<TransactionQueryAggregatorConfiguration>();
-            });
+            
+            services.TryAddSingleton(ValidateAndBind(Configuration));
 
             services.TryAddTransient<ITransactionService, TransactionService>();
-            services.TryAddSingleton<ISerialiser, JsonSerialiser>();
-            services.TryAddTransient<IXmlSerialiser, XmlSerialiser>();
-            services.TryAddTransient<IJsonSerialiser, JsonSerialiser>();
+            services.TryAddSingleton<IGlasswallHttpClient, GlasswallFlurlClient>();
         }
-
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             if (env.IsDevelopment())
@@ -96,6 +85,47 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator
             });
 
             app.UseCors("*");
+        }
+
+        public ITransactionQueryAggregatorConfiguration ValidateAndBind(IConfiguration configuration)
+        {
+            if (string.IsNullOrWhiteSpace(configuration["TransactionQueryServiceEndpointCsv"]))
+                throw new ConfigurationErrorsException("TransactionQueryServiceEndpointCsv must be provided");
+
+            var endpoints = configuration["TransactionQueryServiceEndpointCsv"].Split(",");
+
+            if (endpoints.Any(string.IsNullOrWhiteSpace))
+                throw new ConfigurationErrorsException($"TransactionQueryServiceEndpointCsv was invalid, got '{configuration["TransactionQueryServiceEndpointCsv"]}'");
+
+            foreach (var endpoint in endpoints)
+            {
+                DisableSelfSignedCertificateErrors(endpoint);
+            }
+
+            var businessConfig = new TransactionQueryAggregatorConfiguration();
+
+            configuration.Bind(businessConfig);
+
+            return businessConfig;
+        }
+
+
+        private static void DisableSelfSignedCertificateErrors(string endpoint)
+        {
+            FlurlHttp.ConfigureClient(endpoint, cli =>
+                cli.Settings.HttpClientFactory = new UntrustedCertClientFactory());
+        }
+    }
+
+    [ExcludeFromCodeCoverage]
+    public class UntrustedCertClientFactory : DefaultHttpClientFactory
+    {
+        public override HttpMessageHandler CreateMessageHandler()
+        {
+            return new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (a, b, c, d) => true
+            };
         }
     }
 }
