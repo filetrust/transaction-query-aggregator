@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http;
+using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http.Requests;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Configuration;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Enums;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Models.V1;
@@ -48,8 +49,10 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
             {
                 _logger.LogInformation("Requesting data from Transaction query service '{0}'", endpoint);
 
+                var token = await GetToken(endpoint, cancellationToken);
+
                 var response = await _httpClient.SendAsync<GetDetailResponseV1>(
-                    new GetTransactionDetailRequest(endpoint, fileDirectory),
+                    new GetTransactionDetailRequest(endpoint, fileDirectory, token),
                     cancellationToken);
 
                 _logger.LogInformation("Requested data from Transaction query service '{0}' - {1}", endpoint, response.StatusCode);
@@ -65,6 +68,17 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
                 Status = DetailStatus.FileNotFound,
                 AnalysisReport = null
             };
+        }
+
+        private async Task<string> GetToken(string endpoint, CancellationToken cancellationToken)
+        {
+            _logger.LogInformation("Requesting token from Transaction query service '{0}'", endpoint);
+
+            var response = await _httpClient.SendAsync<string>(
+                    new GetTokenRequest(endpoint, _configuration.Username, _configuration.Password),
+                cancellationToken);
+
+            return response.Body;
         }
 
         private async Task<GetTransactionsResponseV1> InternalGetTransactionsAsync(
@@ -90,8 +104,10 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
             {
                 _logger.LogInformation("Requesting data from Transaction query service '{0}'", endpoint);
 
+                var token = await GetToken(endpoint, cancellationToken);
+
                 var response = await _httpClient.SendAsync<GetTransactionsResponseV1>(
-                    new GetTransactionsRequest(endpoint, requestBody), 
+                    new GetTransactionsRequest(endpoint, requestBody, token), 
                     cancellationToken);
 
                 _logger.LogInformation("Requested data from Transaction query service '{0}' - {1}", endpoint, response.StatusCode);

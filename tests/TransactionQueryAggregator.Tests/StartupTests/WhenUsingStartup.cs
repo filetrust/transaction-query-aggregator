@@ -21,8 +21,11 @@ namespace TransactionQueryAggregator.Tests.StartupTests
             var services = new ServiceCollection();
             var classInTest = Arrange(new Dictionary<string, string>
             {
-                [nameof(ITransactionQueryAggregatorConfiguration.TransactionQueryServiceEndpointCsv)] = expected
+                [nameof(ITransactionQueryAggregatorConfiguration.TransactionQueryServiceEndpointCsv)] = expected,
+                [nameof(ITransactionQueryAggregatorConfiguration.Password)] = expected,
+                [nameof(ITransactionQueryAggregatorConfiguration.Username)] = expected
             });
+
 
             classInTest.ConfigureServices(services);
 
@@ -36,7 +39,9 @@ namespace TransactionQueryAggregator.Tests.StartupTests
             var services = new ServiceCollection();
             var classInTest = Arrange(new Dictionary<string, string>
             {
-                [nameof(ITransactionQueryAggregatorConfiguration.TransactionQueryServiceEndpointCsv)] = expected
+                [nameof(ITransactionQueryAggregatorConfiguration.TransactionQueryServiceEndpointCsv)] = expected,
+                [nameof(ITransactionQueryAggregatorConfiguration.Password)] = expected,
+                [nameof(ITransactionQueryAggregatorConfiguration.Username)] = expected
             });
 
             classInTest.ConfigureServices(services);
