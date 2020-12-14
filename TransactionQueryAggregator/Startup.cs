@@ -97,6 +97,12 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator
             if (endpoints.Any(string.IsNullOrWhiteSpace))
                 throw new ConfigurationErrorsException($"TransactionQueryServiceEndpointCsv was invalid, got '{configuration["TransactionQueryServiceEndpointCsv"]}'");
 
+            if (string.IsNullOrWhiteSpace(configuration["username"]))
+                throw new ConfigurationErrorsException("username was invalid");
+
+            if (string.IsNullOrWhiteSpace(configuration["password"]))
+                throw new ConfigurationErrorsException("password was invalid");
+
             foreach (var endpoint in endpoints)
             {
                 DisableSelfSignedCertificateErrors(endpoint);

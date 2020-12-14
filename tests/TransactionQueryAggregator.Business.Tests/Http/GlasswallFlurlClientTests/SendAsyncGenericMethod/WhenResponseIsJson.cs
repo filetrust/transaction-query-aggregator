@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace TransactionQueryAggregator.Business.Tests.Http.GlasswallFlurlClientTests.SendAsyncGenericMethod
 {
     [TestFixture]
-    public class WhenRequestIsSent : GlasswallFlurlClientTestBase
+    public class WhenResponseIsJson : GlasswallFlurlClientTestBase
     {
         private GlasswallHttpResponse<FakeResponse> _output;
         private FakeRequest _input;

@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http;
+using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http.Requests;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Enums;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Models.V1;
 using Moq;
@@ -27,8 +28,28 @@ namespace TransactionQueryAggregator.Business.Tests.Services.TransactionServiceT
 
             Configuration.Setup(s => s.TransactionQueryServiceEndpointCsv)
                 .Returns(Endpoint1 + "," + Endpoint2);
+            Configuration.Setup(s => s.Username)
+                .Returns("Username");
+            Configuration.Setup(s => s.Password)
+                .Returns("Password");
 
             _input = "/mnt/transactions/analysisreport.xml";
+
+            HttpClient.Setup(s =>
+                    s.SendAsync<string>(It.Is<GetTokenRequest>(x => x.FullPath == $"{Endpoint1}/api/v1/token"), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new GlasswallHttpResponse<string>
+                {
+                    Body = "token",
+                    StatusCode = HttpStatusCode.OK
+                });
+
+            HttpClient.Setup(s =>
+                    s.SendAsync<string>(It.Is<GetTokenRequest>(x => x.FullPath == $"{Endpoint2}/api/v1/token"), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new GlasswallHttpResponse<string>
+                {
+                    Body = "token",
+                    StatusCode = HttpStatusCode.OK
+                });
 
             HttpClient.Setup(s =>
                 s.SendAsync<GetDetailResponseV1>(It.Is<GlasswallHttpRequest>(x => x.FullPath == $"{Endpoint1}/api/v1/transactions?filePath={_input}"), It.IsAny<CancellationToken>()))
@@ -61,6 +82,18 @@ namespace TransactionQueryAggregator.Business.Tests.Services.TransactionServiceT
             HttpClient.Verify(s =>
                 s.SendAsync<GetDetailResponseV1>(It.Is<GlasswallHttpRequest>(
                         x => x.FullPath == $"{Endpoint2}/api/v1/transactions?filePath={_input}"
+                             && x.HttpMethod == HttpMethod.Get),
+                    It.Is<CancellationToken>(x => x == _cancellationToken)), Times.Once);
+
+            HttpClient.Verify(s =>
+                s.SendAsync<string>(It.Is<GlasswallHttpRequest>(
+                        x => x.FullPath == $"{Endpoint1}/api/v1/token"
+                             && x.HttpMethod == HttpMethod.Get),
+                    It.Is<CancellationToken>(x => x == _cancellationToken)), Times.Once);
+
+            HttpClient.Verify(s =>
+                s.SendAsync<string>(It.Is<GlasswallHttpRequest>(
+                        x => x.FullPath == $"{Endpoint2}/api/v1/token"
                              && x.HttpMethod == HttpMethod.Get),
                     It.Is<CancellationToken>(x => x == _cancellationToken)), Times.Once);
 
