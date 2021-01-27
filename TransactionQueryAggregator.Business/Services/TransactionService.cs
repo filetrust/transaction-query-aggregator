@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -41,6 +42,30 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
                 throw new ArgumentException("Value must not be null or whitespace", nameof(fileDirectory));
 
             return InternalTryGetDetailAsync(fileDirectory, cancellationToken);
+        }
+
+        public async IAsyncEnumerable<(DateTimeOffset, long)> AggregateMetricsAsync(DateTimeOffset fromDate, DateTimeOffset toDate, CancellationToken cancellationToken)
+        {
+            foreach (var endpoint in _configuration.TransactionQueryServiceEndpointCsv.Split(','))
+            {
+                _logger.LogInformation("Requesting data from Transaction query service '{0}'", endpoint);
+
+                var token = await GetToken(endpoint, cancellationToken);
+
+                var response = await _httpClient.SendAsync<GetMetricsResponseV1>(
+                    new GetMetricsRequest(endpoint, fromDate, toDate, token),
+                    cancellationToken);
+
+                _logger.LogInformation("Requested data from Transaction query service '{0}' - {1}", endpoint, response.StatusCode);
+
+                if (response.Body == null)
+                    continue;
+
+                foreach (var hour in response.Body.Data)
+                {
+                    yield return (hour.Date, hour.Processed);
+                }
+            }
         }
 
         private async Task<GetDetailResponseV1> InternalTryGetDetailAsync(string fileDirectory, CancellationToken cancellationToken)
