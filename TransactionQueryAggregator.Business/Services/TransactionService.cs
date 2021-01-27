@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http;
@@ -44,7 +45,7 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
             return InternalTryGetDetailAsync(fileDirectory, cancellationToken);
         }
 
-        public async IAsyncEnumerable<(DateTimeOffset, long)> AggregateMetricsAsync(DateTimeOffset fromDate, DateTimeOffset toDate, CancellationToken cancellationToken)
+        public async IAsyncEnumerable<(DateTimeOffset, long)> AggregateMetricsAsync(DateTimeOffset fromDate, DateTimeOffset toDate, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             foreach (var endpoint in _configuration.TransactionQueryServiceEndpointCsv.Split(','))
             {
