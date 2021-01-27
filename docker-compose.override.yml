@@ -5,9 +5,9 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=https://+:443
-      - TransactionQueryServiceEndpointCsv=http://b629386e3a52.ngrok.io/
+      - TransactionQueryServiceEndpointCsv=http://6e41f821b785.ngrok.io/
       - username=example
-      - password=
+      - password=example123456789
     ports:
       - "39433:443"
     volumes:
