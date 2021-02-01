@@ -4,13 +4,56 @@ info:
   description: These are HTTP endpoints that query the transaction store
   version: 0.1.9
 servers:
-  - url: https://transactionqueryaggregatorfunction20201016103513.azurewebsites.net
-    description: Azure function
-  - url: http://localhost:32769
-    description: Local Dev HTTP
-  - url: http://localhost:32768
-    description: Local Dev HTTPS
+  - url: https://localhost:39433
+    description: localhost
 paths:
+  /api/v1/transactions/metrics:
+    get:
+      summary: Aggregates the metrics from each cluster in the ICAP environment
+      description: This endpoint accepts a date range to aggregate metrics form and to
+      parameters:
+        - in: query
+          name: fromDate
+          schema:
+            type: string
+          required: true
+          description: "Inclusive start date to search"
+          example: "2020-01-01T12:00:00"
+        - in: query
+          name: toDate
+          schema:
+            type: string
+          required: true
+          description: "Inclusive end date to search"
+          example: "2022-01-01T12:00:00"
+      responses:
+        200:    # status code
+          description: OK - The transactions were retrieved successfully
+          content:          
+            "application/json":
+              schema:
+                type: object
+                description: A response detailing each transaction file matched by the input filter
+                properties:
+                  totalProcessed:
+                    type: number
+                    example: 100
+                    description: Total number of files processed in the time range
+                  data:
+                    type: array
+                    description: Total number of files processed in the time range by hour
+                    items:
+                      type: object
+                      description: An individual hour segment metric
+                      properties:
+                        date: 
+                          type: string
+                          example: "2021-01-06T17:00:00+00:00"
+                          description: A timestamp of the start of the hour to which the count belongs
+                        processed:
+                          type: number
+                          example: 100
+                          description: A total count of transactions in this hour slot
   /api/v1/transactions:
     post:
       summary: Gets a set of transactions matching the criteria set in the request body
