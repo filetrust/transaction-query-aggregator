@@ -9,6 +9,7 @@ using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http.Reque
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Enums;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Models.AnalysisReport;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Models.V1;
+using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Services;
 using Moq;
 using NUnit.Framework;
 
@@ -23,10 +24,10 @@ namespace TransactionQueryAggregator.Business.Tests.Services.TransactionServiceT
         private CancellationToken _cancellationToken;
         private DateTimeOffset _input1;
         private DateTimeOffset _input2;
-        private IAsyncEnumerable<(DateTimeOffset, long)> _output;
+        private TransactionAnalytics _output;
 
         [OneTimeSetUp]
-        public void Setup()
+        public async Task Setup()
         {
             SharedSetup();
 
@@ -60,35 +61,33 @@ namespace TransactionQueryAggregator.Business.Tests.Services.TransactionServiceT
                 });
 
             HttpClient.Setup(s =>
-                s.SendAsync<GetMetricsResponseV1>(It.IsAny<GlasswallHttpRequest>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new GlasswallHttpResponse<GetMetricsResponseV1>
+                s.SendAsync<TransactionAnalytics>(It.IsAny<GlasswallHttpRequest>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new GlasswallHttpResponse<TransactionAnalytics>
                 {
-                    Body = new GetMetricsResponseV1
+                    Body = new TransactionAnalytics
                     {
-                        Data = new[]
+                        Data = new List<AnalyticalHour>
                         {
-                            new HourlyMetric()
+                            new AnalyticalHour()
                         }
                     },
                     StatusCode = HttpStatusCode.OK
                 });
             
-            _output = ClassInTest.AggregateMetricsAsync(_input1, _input2, _cancellationToken = new CancellationToken(false));
+            _output = await ClassInTest.AggregateMetricsAsync(_input1, _input2, _cancellationToken = new CancellationToken(false));
         }
 
         [Test]
         public async Task Expected_Number_Of_Trips_To_Api_Met()
         {
-            await foreach (var _ in _output.WithCancellation(_cancellationToken)) { }
-
             HttpClient.Verify(s =>
-                s.SendAsync<GetMetricsResponseV1>(It.Is<GlasswallHttpRequest>(
+                s.SendAsync<TransactionAnalytics>(It.Is<GlasswallHttpRequest>(
                         x => x.FullPath == $"{Endpoint1}/api/v1/transactions/metrics?fromDate={_input1:yyyy-MM-ddTHH:mm:ss}&toDate={_input2:yyyy-MM-ddTHH:mm:ss}" 
                         && x.HttpMethod == HttpMethod.Get),
                     It.Is<CancellationToken>(x => x == _cancellationToken)), Times.Once);
 
             HttpClient.Verify(s =>
-                s.SendAsync<GetMetricsResponseV1>(It.Is<GlasswallHttpRequest>(
+                s.SendAsync<TransactionAnalytics>(It.Is<GlasswallHttpRequest>(
                         x => x.FullPath == $"{Endpoint2}/api/v1/transactions/metrics?fromDate={_input1:yyyy-MM-ddTHH:mm:ss}&toDate={_input2:yyyy-MM-ddTHH:mm:ss}"
                              && x.HttpMethod == HttpMethod.Get),
                     It.Is<CancellationToken>(x => x == _cancellationToken)), Times.Once);
