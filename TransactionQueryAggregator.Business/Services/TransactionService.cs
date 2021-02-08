@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Flurl.Util;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Business.Http.Requests;
 using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Configuration;
@@ -45,15 +46,17 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
             return InternalTryGetDetailAsync(fileDirectory, cancellationToken);
         }
 
-        public async IAsyncEnumerable<(DateTimeOffset, long)> AggregateMetricsAsync(DateTimeOffset fromDate, DateTimeOffset toDate, [EnumeratorCancellation] CancellationToken cancellationToken)
+        public async Task<TransactionAnalytics> AggregateMetricsAsync(DateTimeOffset fromDate, DateTimeOffset toDate, [EnumeratorCancellation] CancellationToken cancellationToken)
         {
+            var aggregated = new TransactionAnalytics { Data = new List<AnalyticalHour>() };
+
             foreach (var endpoint in _configuration.TransactionQueryServiceEndpointCsv.Split(','))
             {
                 _logger.LogInformation("Requesting data from Transaction query service '{0}'", endpoint);
 
                 var token = await GetToken(endpoint, cancellationToken);
 
-                var response = await _httpClient.SendAsync<GetMetricsResponseV1>(
+                var response = await _httpClient.SendAsync<TransactionAnalytics>(
                     new GetMetricsRequest(endpoint, fromDate, toDate, token),
                     cancellationToken);
 
@@ -61,12 +64,33 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
 
                 if (response.Body == null)
                     continue;
-
-                foreach (var hour in response.Body.Data)
+                
+                foreach (var newHour in response.Body.Data)
                 {
-                    yield return (hour.Date, hour.Processed);
+                    var aggregatedHour = aggregated.Data.FirstOrDefault(f => f.Date == newHour.Date);
+
+                    if (aggregatedHour == null)
+                    {
+                        aggregated.Data.Add(aggregatedHour = new AnalyticalHour
+                        {
+                            Date = newHour.Date, 
+                            ProcessedByOutcome = new Dictionary<string, long>(),
+                            ProcessedByNcfs = new Dictionary<string, long>()
+                        });
+                    }
+
+                    aggregatedHour.Processed += newHour.Processed;
+                    aggregatedHour.SentToNcfs += newHour.SentToNcfs;
+
+                    if (newHour.ProcessedByNcfs != null)
+                        aggregatedHour.ProcessedByNcfs.Merge(newHour.ProcessedByNcfs);
+                    if (newHour.ProcessedByOutcome != null)
+                        aggregatedHour.ProcessedByOutcome.Merge(newHour.ProcessedByOutcome);
                 }
             }
+
+            aggregated.TotalProcessed = aggregated.Data.Sum(f => f.Processed);
+            return aggregated;
         }
 
         private async Task<GetDetailResponseV1> InternalTryGetDetailAsync(string fileDirectory, CancellationToken cancellationToken)
