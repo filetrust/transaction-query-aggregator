@@ -17,8 +17,9 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Common.Services
     {
         public long TotalProcessed { get; set; }
 
-        public List<AnalyticalHour> Data { get; set; }
+        public long TotalSentToNcfs { get; set; }
 
+        public List<AnalyticalHour> Data { get; set; }
     }
 
     public class AnalyticalHour
