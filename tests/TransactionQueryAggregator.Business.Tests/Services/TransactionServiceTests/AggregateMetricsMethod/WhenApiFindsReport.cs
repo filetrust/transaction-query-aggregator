@@ -78,7 +78,7 @@ namespace TransactionQueryAggregator.Business.Tests.Services.TransactionServiceT
         }
 
         [Test]
-        public async Task Expected_Number_Of_Trips_To_Api_Met()
+        public void Expected_Number_Of_Trips_To_Api_Met()
         {
             HttpClient.Verify(s =>
                 s.SendAsync<TransactionAnalytics>(It.Is<GlasswallHttpRequest>(

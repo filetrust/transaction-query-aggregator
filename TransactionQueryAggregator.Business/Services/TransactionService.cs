@@ -46,7 +46,7 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
             return InternalTryGetDetailAsync(fileDirectory, cancellationToken);
         }
 
-        public async Task<TransactionAnalytics> AggregateMetricsAsync(DateTimeOffset fromDate, DateTimeOffset toDate, [EnumeratorCancellation] CancellationToken cancellationToken)
+        public async Task<TransactionAnalytics> AggregateMetricsAsync(DateTimeOffset fromDate, DateTimeOffset toDate, CancellationToken cancellationToken)
         {
             var aggregated = new TransactionAnalytics { Data = new List<AnalyticalHour>() };
 
@@ -81,6 +81,8 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
 
                     aggregatedHour.Processed += newHour.Processed;
                     aggregatedHour.SentToNcfs += newHour.SentToNcfs;
+                    aggregated.TotalProcessed += newHour.Processed;
+                    aggregated.TotalSentToNcfs += newHour.SentToNcfs;
 
                     if (newHour.ProcessedByNcfs != null)
                         aggregatedHour.ProcessedByNcfs.Merge(newHour.ProcessedByNcfs);
@@ -89,7 +91,6 @@ namespace Glasswall.Administration.K8.TransactionQueryAggregator.Business.Servic
                 }
             }
 
-            aggregated.TotalProcessed = aggregated.Data.Sum(f => f.Processed);
             return aggregated;
         }
 

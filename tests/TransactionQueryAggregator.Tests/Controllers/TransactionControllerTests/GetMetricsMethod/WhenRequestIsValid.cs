@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Glasswall.Administration.K8.TransactionQueryAggregator.Common.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -13,7 +14,7 @@ namespace TransactionQueryAggregator.Tests.Controllers.TransactionControllerTest
     public class WhenRequestIsValid : TransactionControllerTestBase
     {
         private IActionResult _result;
-        private IAsyncEnumerable<(DateTimeOffset, long)> _expected;
+        private TransactionAnalytics _expected;
         private DateTimeOffset _input1;
         private DateTimeOffset _input2;
 
@@ -22,14 +23,13 @@ namespace TransactionQueryAggregator.Tests.Controllers.TransactionControllerTest
         {
             base.OnetimeSetupShared();
 
-            _expected = AsAsyncEnumerable(new List<(DateTimeOffset, long)>
+            _expected = new TransactionAnalytics
             {
-                 (new DateTimeOffset(new DateTime(2020, 1, 1, 1, 0, 0)), 300),
-                 (new DateTimeOffset(new DateTime(2020, 1, 1, 1, 0, 0)), 200)
-            });
+                Data = new List<AnalyticalHour>()
+            };
 
             Service.Setup(s => s.AggregateMetricsAsync(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>(), It.IsAny<CancellationToken>()))
-                .Returns(_expected);
+                .ReturnsAsync(_expected);
 
             _result = await ClassInTest.GetMetrics(_input1 = DateTimeOffset.UtcNow, _input2 = DateTimeOffset.UtcNow, CancellationToken.None);
         }
@@ -72,18 +72,7 @@ namespace TransactionQueryAggregator.Tests.Controllers.TransactionControllerTest
 
             Assert.That(_result, Is.InstanceOf<OkObjectResult>()
                 .With.Property(nameof(OkObjectResult.Value))
-                .With.Property("totalProcessed").EqualTo(500));
-            Assert.That(_result, Is.InstanceOf<OkObjectResult>()
-                .With.Property(nameof(OkObjectResult.Value))
-                .With.Property("data").With.One.Items.With.Property("processed").EqualTo(500));
-        }
-
-        private static async IAsyncEnumerable<(DateTimeOffset, long)> AsAsyncEnumerable(IEnumerable<(DateTimeOffset, long)> dates)
-        {
-            foreach (var date in dates)
-            {
-                yield return (date.Item1, date.Item2);
-            }
+                .EqualTo(_expected));
         }
     }
 }
