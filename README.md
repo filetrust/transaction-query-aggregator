@@ -71,6 +71,50 @@ Sample Response:
 
 This endpoint gets the detail of a single transaction. The POST endpoint returns the directory for each file found, for use with this endpoint as parameter "filePath". With this path, it will pull down the report.xml and return that as a JSON object.
 
+### GET api/v1/transactions/metrics?fromDate={fromDate}&toDate={toDate}
+
+This endpoint accepts a date range to aggregate metrics from and to. These metrics are gathered from transaction-query-service endpoints.
+
+The Transaction Query Service API on the adaptation cluster works by looping through the transaction stores events which are written by the event-submission-service to a single file per file that is processed through the icap system. It then matches these transactions based on the folder structure, in the same way that the transaction log works. (Year/Month/Day/Hour/[file-id]).
+
+For each file that it finds in the folder, it reads the metadata.json file containing each event. It specifically looks for 3 events:
+- NewDocumentEvent (0x10 EventId)
+- RebuildCompletedEvent (0x60 EventId)
+- NcfsCompletedEvent (0x90 EventId)
+
+Internally the API keeps these counts separated by hour.
+
+- The Processed field for each hour is incremented each time a NewDocumentEvent is found.
+RebuildCompletedEvent is used to get a count of files by outcome
+- The SentToNcfs field is incremented when the NCFSOutcome field inside the NCFSCompletedEvent is set. (I believe this event is sent after the NCFS API is called in the adaptation cluster)
+- The Transaction-query-aggregator API on the administration cluster then collates all the transaction-query-service responses from each adaptation cluster into a single response.
+
+Here is an example response from the API:
+
+```
+{
+    "totalProcessed": 15,
+    "totalSentToNcfs": 0,
+    "data": [
+        {
+            "processed": 1,
+            "sentToNcfs": 0,
+            "date": "2021-02-09T08:00:00+00:00",
+            "processedByOutcome": {
+                "Failed": 0,
+                "Replace": 1,
+                "Unmodified": 0
+            },
+            "processedByNcfs": {
+                "Blocked": 0,
+                "Relayed": 0,
+                "Replaced": 0
+            }
+        },
+   ...
+}
+```
+
 ## Useful links
 
 See [Static data generation tool](https://github.com/filetrust/transaction-query-aggregator-static-data) for a way to generate data to test this API with.
