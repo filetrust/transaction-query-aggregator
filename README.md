@@ -2,14 +2,11 @@
 
 ## Description 
 
-This API retrieves transactions from Azure File Shares. 
+This API retrieves transactions from a mounted file store. An example usage is with Azure File Shares in kubernetes. Once mounted as a persistent volume, this API will use it to store transactional infomation.
 
 ## Configuration
 
-These are the following configuration items that can be set. Setting these items can be done through environment variables.
 
-- "TransactionStoreConnectionStringCsv" - This required is a comma separated list of connection strings to azure file shares.
-- "ShareName" - This required setting is the name of the share on each share to look in for transactions.
 
 ## Search algorithm 
 
