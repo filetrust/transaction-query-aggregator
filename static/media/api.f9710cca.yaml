@@ -39,6 +39,10 @@ paths:
                     type: number
                     example: 100
                     description: Total number of files processed in the time range
+                  totalSentToNcfs:
+                    type: number
+                    example: 5
+                    description: Total number of files processed by NCFS
                   data:
                     type: array
                     description: Total number of files processed in the time range by hour
